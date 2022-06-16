@@ -1,0 +1,15 @@
+opencv-contrib-python
+Cython
+numba
+progress
+matplotlib
+easydict
+scipy
+pyrr
+tqdm
+pyyaml
+shapely
+trimesh
+python-fcl
+pyrender
+pyassimp
