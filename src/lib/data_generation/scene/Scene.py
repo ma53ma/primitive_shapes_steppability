@@ -8,7 +8,7 @@ from typing import List
 from copy import deepcopy
 import numpy as np
 import pyrender
-from torch import sin
+# from torch import sin
 import trimesh
 from scipy.spatial.transform import Rotation as R
 
@@ -80,8 +80,13 @@ class Scene():
         if isinstance(resample_xy_loc, bool):
             resample_xy_loc = [resample_xy_loc] * N_obj
 
+        count = 0
         for obj, pose_sample, xy_resample in zip(objs, sample_pose, resample_xy_loc):
+            print("adding object ", count, ", of ", N_obj)
+            print(obj)
             self.add_obj(obj, sample_pose=pose_sample, resample_xy_loc=xy_resample)
+            count += 1
+        print('done adding objects')
     
     def add_obj(self, object:Base, sample_pose=False, resample_xy_loc=False):
         """Add an object to the scene
@@ -99,25 +104,30 @@ class Scene():
         """
 
         # sample the pose
+        print("sampling")
         pose, succ = self._sample_obj_pose(object, sample_pose=sample_pose, resample_xy_loc=resample_xy_loc)
         if not succ and not (succ is None):
+            print('fail')
             raise RuntimeError("No stable pose can be generated for this object.")
-        
+
+        print("setting pose")
         object.set_pose(pose)
 
         if object.get_obj_type() == "stick":
             object = self._rectify_stick_pose(object)
 
         # add to the list
+        print("appending")
         self.objects.append(object)
 
+        print("adding to collision manager")
         # add to the collision manager, named by "obj_" + index number
         self.collision_manager_obj.add_object(
             name = "obj_"+str(len(self.objects) - 1),
             mesh = trimesh.util.concatenate(object.get_mesh(grasp=False, obj_frame=False, world_frame=False, gripper_frame=False)),
             transform = None
         )
-
+        print("done adding to collision manager")
         # any new object added means the grasp needs to be re-analyzed
         self.grasp_analyzed = False
     
@@ -188,7 +198,7 @@ class Scene():
             table_dist_tol: The tolerance for an object to "sink" in the table due to the numerical reason. Ideally they should be zero
         
         Returns:
-            pose (array, (4,4)): The sampled pose in teh homogenous form
+            pose (array, (4,4)): The sampled pose in the homogenous form
             succ (bool): The success flag of whether a pose has been successfully sampled. If not sampling, then return None
         """
         if not sample_pose and not resample_xy_loc:
@@ -209,11 +219,14 @@ class Scene():
 
         count = 0
         while (count <  max_iter):
+            print('in loop')
             # Get a random pose
             pose = self._get_random_stable_pose(poses, poses_probs)
             # Get a random translation
-            loc =  self._sample_loc() 
+            loc =  self._sample_loc()
+            # print('loc: ', loc)
             if (abs(loc[0]) > self.table_size/2) or (abs(loc[1]) > self.table_size/2):
+                # print("off table")
                 continue
 
             # the pose
@@ -236,8 +249,9 @@ class Scene():
             if succ:
                 break
             count = count + 1
-            
 
+        succ = True
+        print('returning')
         return pose, succ
     
     def _sample_loc(self):
@@ -360,8 +374,8 @@ class Scene():
             table_mesh  (list): The mesh for the table. If world_frame, will include the world frame mesh
         """
 
-        if not self.grasp_analyzed:
-            self.analyze_grasps() 
+        #if not self.grasp_analyzed:
+        #    self.analyze_grasps()
 
         obj_meshes = []
         for obj in self.objects:

@@ -35,9 +35,7 @@ class SceneRender(Scene):
                 If set to a 4-by-by array, then will use it as the intrinsic. Defaults to "realsense".
         """
         super().__init__(table_size, table_thickness, table_color)
-        print('before table self.objects: ', self.objects)
         self.objects.append(self.table)
-        print('after table append:', self.objects)
         self.camera_num = camera_num
 
         # The camera intrinsic matrix
@@ -198,32 +196,33 @@ class SceneRender(Scene):
 
     def _render_steppability_masks(self, grasp_mode, pose, img_renderer):
 
-        table_colors = [[0, 0, 255, 255], [0, 0, 255, 255],
-                       [0, 0, 255, 255], [0, 0, 255, 255],
-                       [0, 255, 0, 255], [0, 0, 255, 255],
-                       [0, 255, 0, 255], [0, 0, 255, 255],
-                       [0, 0, 255, 255], [0, 0, 255, 255],
-                       [0, 0, 255, 255], [0, 0, 255, 255]]
-
-        non_steppable_color = np.array([[0, 0, 255, 255]])
+        non_steppable_color = np.array([[0, 0, 255, 255]])  # red
+        steppable_color = np.array([[0, 255, 0, 255]])  # green
+        table_colors = np.repeat(non_steppable_color, len(self.table.obj_mesh.faces), axis=0)
+        table_colors[4] = steppable_color
+        table_colors[6] = steppable_color
         self.table.obj_mesh.visual.face_colors = table_colors
 
         for i in range(0, len(self.objects)):
+            num_faces = len(self.objects[i].obj_mesh.faces)
+            print('num faces: ', num_faces)
+            face_colors = np.repeat(non_steppable_color, num_faces, axis=0)
+
             print('i: ', i, ", : ", self.objects[i].type)
-            if self.objects[i].type == "cuboid":
+            if self.objects[i].type == "cuboid":    # 12 faces
                 print('fixing cuboid')
-                face_colors = [[0, 0, 255, 255], [0, 0, 255, 255],
-                   [0, 0, 255, 255], [0, 255, 0, 255],
-                   [0, 0, 255, 255], [0, 0, 255, 255],
-                   [0, 0, 255, 255], [0, 0, 255, 255],
-                   [0, 255, 0, 255], [0, 0, 255, 255],
-                   [0, 0, 255, 255], [0, 0, 255, 255]]
+                face_colors[4] = steppable_color        # was previously 3,8
+                face_colors[6] = steppable_color
+                self.objects[i].obj_mesh.visual.face_colors = face_colors
+            elif self.objects[i].type == "stick":   # 128 faces
+                num_faces = 128
+                for j in range(3, num_faces, 4):
+                    face_colors[j] = steppable_color
 
                 self.objects[i].obj_mesh.visual.face_colors = face_colors
-            elif self.objects[i].type == "sphere":
-                num_faces = len(self.objects[i].obj_mesh.faces)
-                face_colors = np.repeat(non_steppable_color, num_faces, axis=0)
+            else:
                 self.objects[i].obj_mesh.visual.face_colors = face_colors
+
 
 
         scene = self.to_pyrender_scene(grasp_mode=grasp_mode, world_frame=False, obj_frame=False, gripper_frame=False)
@@ -427,87 +426,3 @@ class SceneRender(Scene):
         camera_poses = np.array(camera_poses)
         s.camera_poses = cam_pose_convert(camera_poses, mode="cv2gl")
         return s
-
-'''     
-if __name__ == "__main__":
-    from data_generation import Sphere, Cuboid, Cylinder, Grasp
-    from utils.keypoints import kpts_3d_to_2d, plot_grasps_kpts
-    import trimesh.transformations as tra
-
-    import matplotlib.pyplot as plt
-
-    grasp_mode = 1
-
-    # create the scene
-    s = SceneRender(camera_num=5, table_color=[1.0, 0.0, 0.0, 1])
-    cuboid1 = Cuboid(0.06, 0.06, 0.08, pose=create_homog_matrix(T_vec=[-0.05, -0.05, 0.04]), color=np.random.choice(range(256), 3).astype(np.uint8))
-    #cuboid2 = Cuboid(4, 4, 4, pose=create_homog_matrix(T_vec=[-0.1, 0.05, 0.02]), color=np.random.choice(range(256), 3).astype(np.uint8))
-    stick = Cylinder(0.01, 0.07, mode="stick")
-    bowl = Sphere(0.08, semiSphere=True, pose=create_homog_matrix(T_vec=[0.08, 0.1, 0.08]), color=np.random.choice(range(256), 3).astype(np.uint8))
-    try:
-        print("Adding the first object")
-        s.add_obj(cuboid1, sample_pose=True)
-        print("Adding the second object")
-        s.add_obj(stick, sample_pose=True)
-        print("Adding the third object")
-        s.add_obj(bowl, sample_pose=True)
-        # NOTE: if the parameter is not designed correctly, some objects might not be able to added since the colllision is inevitable
-    except RuntimeError:
-        print("Some objects can not be added") 
-    s.vis_scene(grasp_mode=grasp_mode, mode="trimesh", world_frame=True)
-
-    # get the grasp poses and the camera poses
-    grasp_poses, grasp_open_widths, grasp_collides = s.get_grasp_infos()
-    intrinsic, camera_poses, proj_mats = s.get_camera_infos("OpenCV")
-
-    grasp_poses = np.concatenate(grasp_poses, axis=0)
-    grasp_open_widths = np.concatenate(grasp_open_widths, axis=0)
-    grasp_collides = np.concatenate(grasp_collides, axis=0)
-
-    # grasp keypoints mode
-    grasp_kpts_mode = "hedron"
-
-    # take the images
-    ins_masks = None
-    colors, depths, ins_masks = s.render_imgs(grasp_mode=-1,instance_masks=True)
-    #colors, depths = s.render_imgs(instance_masks=False)
-    for idx, (color, depth) in enumerate(zip(colors, depths)):
-        camera_pose = camera_poses[idx] 
-        if ins_masks is not None:
-            ins_mask = ins_masks[idx]
-
-        # plot the grasp keypoints - sample a few
-        sample_num = int(grasp_poses.shape[0] / 5)
-        sample_idxes = np.random.choice(np.arange(grasp_poses.shape[0]), sample_num, replace=False)
-        # grasp kpts cache
-        grasp_kpts = []
-        for i in sample_idxes:
-           grasp_pose = grasp_poses[i, :, :]
-           grasp_width = grasp_open_widths[i]
-           grasp_collide = grasp_collides[i]
-           # skip invalid grasps
-           if grasp_collide:
-               continue
-
-           grasp = Grasp(grasp_width, pose=grasp_pose, kpts_option=grasp_kpts_mode)
-           kpts_coord = grasp.get_kpts(frame="world")  # the keypoint coordinate in the gripper frame, (N_kpt, 3)
-
-           kpts_img = kpts_3d_to_2d(intrinsic, np.linalg.inv(camera_pose), kpts_coord)
-
-           grasp_kpts.append(kpts_img)
-        color = plot_grasps_kpts(color, grasp_kpts, kpts_mode=grasp_kpts_mode, size=4)
-
-        if ins_masks is not None:
-            f, axarr = plt.subplots(1, 3)
-        else:
-            f, axarr = plt.subplots(1, 2)
-        im = axarr[0].imshow(color)
-        f.colorbar(im, ax=axarr[0])
-        im = axarr[1].imshow(depth)
-        f.colorbar(im, ax=axarr[1])
-
-        if ins_masks is not None:
-            im = axarr[2].imshow(ins_mask)
-            f.colorbar(im, ax=axarr[2])
-    plt.show() 
-'''

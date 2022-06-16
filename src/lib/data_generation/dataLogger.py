@@ -55,8 +55,8 @@ class DataLogger():
         self.seg_dir = None
 
     def save_scene_data(self, scene_idx, camera_mat, camera_poses, rgb_imgs, depths, seglabel_maps,\
-            grasp_poses, grasp_widths, grasp_collision, \
-            obj_types, obj_dims, obj_poses):
+            grasp_poses=None, grasp_widths=None, grasp_collision=None, \
+            obj_types=None, obj_dims=None, obj_poses=None):
         """ Save scenen data
 
         Args:
@@ -81,8 +81,8 @@ class DataLogger():
         self.save_colors(rgb_imgs)
         self.save_depths(depths)
         self.save_seg(seglabel_maps)
-        self.save_info(camera_mat, camera_poses, grasp_poses, grasp_widths, grasp_collision, 
-            obj_types=obj_types, obj_dims=obj_dims, obj_poses=obj_poses)
+        #self.save_info(camera_mat, camera_poses, grasp_poses, grasp_widths, grasp_collision,
+        #    obj_types=obj_types, obj_dims=obj_dims, obj_poses=obj_poses)
     
     def _make_scene_subdirs(self, scene_idx):
         """Make the scene subdirectories and store them as attributes of the logger.

@@ -11,7 +11,7 @@ import random
 import _init_paths
 
 from utils.configs import load_config
-from data_generation import SceneRender, Cuboid, Cylinder, Sphere
+from data_generation import SceneRender, Cuboid, Cylinder, Sphere, Cone
 from data_generation.dataLogger import DataLogger
 from utils.transform import create_homog_matrix
 from utils.file import read_numList_from_file, write_numList_to_file
@@ -31,7 +31,9 @@ class ObjSampler():
         ring_rin_range,
         ring_h_range,
         stick_rin_range,
-        stick_h_range
+        stick_h_range,
+        cone_r_range,
+        cone_height_range
     ):
         self.cuboid_size_range = cuboid_size_range
         self.sphere_radius_range = sphere_radius_range
@@ -42,6 +44,8 @@ class ObjSampler():
         self.ring_h_range = ring_h_range
         self.stick_rin_range = stick_rin_range
         self.stick_h_range = stick_h_range
+        self.cone_r_range = cone_r_range
+        self.cone_height_range = cone_height_range
     
     def sample_obj(self, obj_type):
         color = np.random.choice(range(256), size=3)
@@ -76,6 +80,12 @@ class ObjSampler():
             r_in = np.random.uniform(self.stick_rin_range[0], self.stick_rin_range[1])
             height = np.random.uniform(self.stick_h_range[0], self.stick_h_range[1])
             obj = Cylinder(r_in = r_in, height = height, mode="stick", color=color)
+        elif obj_type == "cone":
+            print('adding cone')
+            r = np.random.uniform(self.cone_r_range[0], self.cone_r_range[1])
+            height = np.random.uniform(self.cone_height_range[0], self.cone_height_range[1])
+            sections = 16
+            obj = Cone(radius=r, height=height, sections=sections)
         else:
             raise NotImplementedError("The object type \"{}\" is not implemented".format(obj_type))
         return obj
@@ -119,6 +129,8 @@ def main(args, configs):
         ring_h_range=configs["OBJECT"]["ring_h_range"],
         stick_rin_range=configs["OBJECT"]["stick_rin_range"],
         stick_h_range=configs["OBJECT"]["stick_h_range"],
+        cone_r_range=configs["OBJECT"]["cone_r_range"],
+        cone_height_range=configs["OBJECT"]["cone_height_range"]
     )
 
     logger = DataLogger(logging_directory=configs["SAVE_PATH"])
@@ -145,20 +157,21 @@ def main(args, configs):
             obj_names_scene = [random.choice(OBJ_NAMES)]
             # obj_names_scene = ["stick"]
 
-        obj_names_scene = ["cuboid", "sphere"]
-
+        obj_names_scene = ["cuboid", "cuboid", "cuboid", "cuboid", "cuboid", "cuboid"]
+        print('obj_names_scene: ', obj_names_scene)
         # add the objects
         for obj_name in obj_names_scene:
             obj = obj_sampler.sample_obj(obj_name)
             obj_list.append(obj)
             # If sphere or semi-sphere, just sample the location instead of the orientation
-            if obj_name == "sphere" or obj_name == "bowl":
-                sample_pose.append(False)
-                resample_loc.append(True)
+            if obj_name == "sphere" or obj_name == "bowl" or obj_name == "stick" or obj_name == "cone" or obj_name == "cuboid":
+                sample_pose.append(False)   # orientation
+                resample_loc.append(True)   # position
             else:
                 sample_pose.append(True)
                 resample_loc.append(False)
         try:
+           print('adding objects to scene')
            scene_renderer.add_objs(obj_list, sample_pose=sample_pose, resample_xy_loc=resample_loc)
         except:
            tqdm_bar.set_description( "Failed to add the object. Retrying...")
@@ -169,7 +182,7 @@ def main(args, configs):
 
         # get info
         intrinsic, cam_poses, _ = scene_renderer.get_camera_infos(style="OpenCV")
-        grasp_poses, open_widths, collides = scene_renderer.get_grasp_infos()
+        # grasp_poses, open_widths, collides = scene_renderer.get_grasp_infos()
         obj_types, obj_dims, obj_poses = scene_renderer.get_obj_infos()
         colors, depths, ins_masks = scene_renderer.render_imgs(instance_masks=True)
         tqdm_bar.set_description("The image data rendered...Saving them out")
@@ -188,14 +201,15 @@ def main(args, configs):
                 im = axarr[2].imshow(ins_mask)
                 #f.colorbar(im, ax=axarr[2])
             plt.show()
-
         # save out the info
-        logger.save_scene_data(scene_count, intrinsic, cam_poses, colors, depths, ins_masks, \
-            grasp_poses, open_widths, grasp_collision=collides, \
-            obj_types=obj_types, obj_dims=obj_dims, obj_poses=obj_poses)
+        print('saving scene data')
+        logger.save_scene_data(scene_count, intrinsic, cam_poses, colors, depths, ins_masks)
+        #, \
+        #   grasp_poses, open_widths, grasp_collision=collides, \
+        #  obj_types=obj_types, obj_dims=obj_dims, obj_poses=obj_poses)
         tqdm_bar.set_description("Scene data saved out.")
-
         # scene count
+        print('updating scene count')
         scene_count = scene_count + 1
         tqdm_bar.update()
     

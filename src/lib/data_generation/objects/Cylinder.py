@@ -41,7 +41,12 @@ class Cylinder(Base):
 
         # create the instance
         super().__init__(pose=pose, color=color, trl_sample_num=trl_sample_num, ang_sample_num=ang_sample_num)
-    
+
+        if self.mode == "stick":
+            self.type = "stick"
+        else:
+            self.type = "cylinder"
+
     def generate_mesh(self):
         """The PSCNN code (gneerate_mesh_vertices) seems not creating the inner surface, making the mesh incomplete.
         So temporarily overwrite it.

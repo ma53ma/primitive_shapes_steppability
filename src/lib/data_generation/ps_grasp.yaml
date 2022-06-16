@@ -20,4 +20,6 @@ OBJECT:
   ring_h_range: [0.008, 0.024]
   stick_rin_range: [0.008, 0.015]
   stick_h_range: [0.04, 0.01]
+  cone_r_range: [0.02, 0.05]
+  cone_height_range: [0.1, 0.2]
 
